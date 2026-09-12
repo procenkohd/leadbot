@@ -27,7 +27,7 @@ from aiogram.types import (
 )
 
 import db
-from config import ADMIN_ID, BOT_TOKEN, BOT_TYPES, HOSTING_NOTE, PRICING, TIER_LABELS
+from config import ADMIN_ID, BOT_TOKEN, BOT_TYPES, HOSTING_NOTE, PRICING
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -124,23 +124,16 @@ async def price_start(message: Message) -> None:
     await message.answer("Выберите тип бота:", reply_markup=calc_type_kb())
 
 
-def _support_block() -> str:
-    lines = [f"{TIER_LABELS[key]}: {info['support']}" for key, info in PRICING.items()]
-    return (
-        "Также доступно ежемесячное сопровождение бота (доработки, "
-        "исправление багов, мелкие правки):\n\n" + "\n".join(lines)
-    )
-
-
 @dp.callback_query(F.data.startswith("calc:"))
 async def price_show(callback: CallbackQuery) -> None:
     key = callback.data.split(":", 1)[1]
     info = PRICING[key]
     text = (
         f"{BOT_TYPES[key].capitalize()}\n\n"
-        f"Цена: {info['price']}\n"
+        f"Цена: от {info['price_min']} (точная стоимость определяется после обсуждения деталей задачи)\n"
         f"Срок: {info['eta']}\n\n"
-        f"{_support_block()}\n\n"
+        "Также доступно ежемесячное сопровождение бота (доработки, "
+        f"исправление багов, мелкие правки): {info['support']}\n\n"
         f"{HOSTING_NOTE}"
     )
     kb = InlineKeyboardMarkup(
