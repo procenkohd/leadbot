@@ -36,6 +36,14 @@ CREATE TABLE IF NOT EXISTS reviews (
     admin_message_id INTEGER,
     created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS guide_downloads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    username TEXT,
+    full_name TEXT NOT NULL,
+    downloaded_at TEXT NOT NULL
+);
 """
 
 
@@ -102,3 +110,14 @@ def get_approved_reviews() -> list[sqlite3.Row]:
         return conn.execute(
             "SELECT * FROM reviews WHERE status = 'approved' ORDER BY id DESC"
         ).fetchall()
+
+
+def add_guide_download(user_id: int, username: str | None, full_name: str) -> int:
+    with closing(_connect()) as conn:
+        cur = conn.execute(
+            "INSERT INTO guide_downloads (user_id, username, full_name, downloaded_at)"
+            " VALUES (?, ?, ?, ?)",
+            (user_id, username, full_name, _now()),
+        )
+        conn.commit()
+        return cur.lastrowid

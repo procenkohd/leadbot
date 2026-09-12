@@ -19,6 +19,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import (
     CallbackQuery,
+    FSInputFile,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     KeyboardButton,
@@ -27,7 +28,16 @@ from aiogram.types import (
 )
 
 import db
-from config import ADMIN_ID, BOT_TOKEN, BOT_TYPES, HOSTING_NOTE, PRICING
+from config import (
+    ADMIN_ID,
+    BOT_TOKEN,
+    BOT_TYPES,
+    GUIDE_CHANNEL_URL,
+    GUIDE_CHANNEL_USERNAME,
+    GUIDE_FILE_PATH,
+    HOSTING_NOTE,
+    PRICING,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -43,18 +53,36 @@ WELCOME_TEXT = (
 BTN_REQUEST = "📝 Оставить заявку"
 BTN_PRICE = "💰 Узнать примерную стоимость"
 BTN_REVIEWS = "⭐ Отзывы"
+BTN_GUIDE = "🤖 Гайд: как собрать бота на ИИ"
 BTN_CANCEL = "✖️ Отмена"
 BTN_SHARE_CONTACT = "📱 Поделиться контактом"
 BTN_LEAVE_REVIEW = "✍️ Оставить отзыв"
 BTN_SEND = "✅ Отправить"
 BTN_SEND_ANON = "🙈 Отправить анонимно"
 BTN_OTHER_TYPE = "Другое"
+BTN_GET_GUIDE = "🎁 Получить бесплатно"
+BTN_CHECK_GUIDE_SUB = "✅ Я подписался, проверить"
+
+GUIDE_INTRO_TEXT = (
+    "Короткий гайд о том, как быстро собрать своего первого Telegram-бота "
+    "с помощью ИИ — без опыта программирования. Полезно, если хотите "
+    "разобраться в теме до заказа или попробовать сделать что-то простое "
+    "самому."
+)
+
+GUIDE_NOT_SUBSCRIBED_TEXT = "Подпишись на канал, чтобы получить бесплатный гайд"
+
+GUIDE_TEASER_TEXT = (
+    "Совсем скоро здесь появится расширенная версия с готовыми шаблонами "
+    "под разные типы ботов — следи за обновлениями."
+)
 
 main_kb = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text=BTN_REQUEST)],
         [KeyboardButton(text=BTN_PRICE)],
         [KeyboardButton(text=BTN_REVIEWS)],
+        [KeyboardButton(text=BTN_GUIDE)],
     ],
     resize_keyboard=True,
 )
@@ -385,6 +413,58 @@ async def review_reject(callback: CallbackQuery) -> None:
         await callback.message.edit_text(callback.message.text + "\n\n❌ ОТКЛОНЕНО")
     except Exception:
         pass
+
+
+# ---------- бесплатный гайд ----------
+
+def guide_subscribe_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="➡️ Подписаться на канал", url=GUIDE_CHANNEL_URL)],
+            [InlineKeyboardButton(text=BTN_CHECK_GUIDE_SUB, callback_data="guide:check")],
+        ]
+    )
+
+
+async def _is_subscribed_to_guide_channel(bot: Bot, user_id: int) -> bool:
+    try:
+        member = await bot.get_chat_member(GUIDE_CHANNEL_USERNAME, user_id)
+        return member.status in ("member", "administrator", "creator")
+    except Exception:
+        logger.exception("Failed to check guide channel subscription")
+        return False
+
+
+async def _send_guide(message: Message, user) -> None:
+    await message.answer_document(FSInputFile(GUIDE_FILE_PATH))
+    await message.answer(GUIDE_TEASER_TEXT)
+    db.add_guide_download(user_id=user.id, username=user.username, full_name=user.full_name)
+
+
+@dp.message(F.text == BTN_GUIDE)
+async def guide_intro(message: Message) -> None:
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text=BTN_GET_GUIDE, callback_data="guide:get")]]
+    )
+    await message.answer(GUIDE_INTRO_TEXT, reply_markup=kb)
+
+
+@dp.callback_query(F.data == "guide:get")
+async def guide_get(callback: CallbackQuery, bot: Bot) -> None:
+    await callback.answer()
+    if await _is_subscribed_to_guide_channel(bot, callback.from_user.id):
+        await _send_guide(callback.message, callback.from_user)
+        return
+    await callback.message.answer(GUIDE_NOT_SUBSCRIBED_TEXT, reply_markup=guide_subscribe_kb())
+
+
+@dp.callback_query(F.data == "guide:check")
+async def guide_check(callback: CallbackQuery, bot: Bot) -> None:
+    if await _is_subscribed_to_guide_channel(bot, callback.from_user.id):
+        await callback.answer("Подписка подтверждена!")
+        await _send_guide(callback.message, callback.from_user)
+        return
+    await callback.answer("Пока не вижу подписку, попробуй ещё раз через пару секунд", show_alert=True)
 
 
 async def main() -> None:

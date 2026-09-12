@@ -6,9 +6,16 @@
 """
 
 import os
+from pathlib import Path
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", "537259850") or "0")
+
+# бесплатный гайд по сборке ботов на ИИ: файл лежит в git (как phrases.txt у
+# мем-бота), выдаётся только подписчикам канала
+GUIDE_CHANNEL_USERNAME = "@protsenko_notes"
+GUIDE_CHANNEL_URL = "https://t.me/protsenko_notes"
+GUIDE_FILE_PATH = Path(__file__).parent / "files" / "vibecoding_bots_free.pdf"
 
 # ключ — он же callback_data и код типа бота в базе
 BOT_TYPES = {
